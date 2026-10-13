@@ -60,3 +60,60 @@ function joinForm(){let initial=new URLSearchParams(location.search).get('room')
  $('#joinForm').onsubmit=async e=>{e.preventDefault();let b=$('#joinBtn');b.disabled=true;try{let code=$('#room').value.trim(),prev=read('price.student.'+code);let s=await api('/api/join',{code,name:$('#name').value,key:prev?.key},'');status();adopt(s);}catch(e){error(e);}finally{if(b.isConnected)b.disabled=false;}};}
 function init(){if(teacher){let stored=read('price.teacher',sessionStorage);if(stored){adopt(stored);return;}setup();}else{let code=new URLSearchParams(location.search).get('room');let stored=code&&read('price.student.'+code);if(stored){adopt(stored);return;}joinForm();}}
 setInterval(poll,1100);setInterval(timer,200);window.addEventListener('online',()=>{lastView='';poll();});init();
+function playDrumroll(durationMs = 2200) {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const duration = durationMs / 1000;
+
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1000;
+    filter.Q.value = 2;
+
+    const gain = ctx.createGain();
+    const now = ctx.currentTime;
+    const pulseRate = 18;
+
+    for (let t = 0; t < duration; t += 1 / pulseRate) {
+      const pTime = now + t;
+      gain.gain.setValueAtTime(0.6, pTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, pTime + (1 / pulseRate) * 0.85);
+    }
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    noise.start(now);
+    noise.stop(now + duration);
+
+    setTimeout(() => {
+      try {
+        const osc = ctx.createOscillator();
+        const hitGain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(180, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.35);
+
+        hitGain.gain.setValueAtTime(1.0, ctx.currentTime);
+        hitGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+
+        osc.connect(hitGain);
+        hitGain.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+      } catch (e) {}
+    }, durationMs);
+  } catch (e) {}
+}
