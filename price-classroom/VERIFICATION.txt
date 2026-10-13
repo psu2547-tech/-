@@ -1,0 +1,8 @@
+PASS: all 16 required source/config/guide/test files exist and are non-empty.
+PASS: npm start / npm test entrypoints and package JSON.
+PASS: all relative Node require targets exist.
+PASS: HTML script/style references resolve to local app assets.
+PASS: app has no dependency on original website; teacher PIN and deploy-time tests configured.
+PASS: 3 independent QR fixture matrices generated with Python qrcode (NOT compared by executing the JavaScript encoder here).
+NOT RUN: JavaScript syntax/runtime/API tests, browser UI tests, physical QR scanning, live deployment, school Wi-Fi, speech recognition.
+Node runtime unavailable. Test code is included, not claimed passed.

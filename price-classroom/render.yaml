@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: price-classroom
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm test
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: TEACHER_PIN
+        sync: false
