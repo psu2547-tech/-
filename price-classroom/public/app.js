@@ -23,25 +23,43 @@ function showQR(){$('#qrContent').innerHTML=qrHTML();$('#qrDialog').showModal();
 $('#closeQR').onclick=()=>$('#qrDialog').close();
 function render(d){if(teacher)renderTeacher(d);else renderStudent(d);bindCommon();}
 function students(d){let list=[...(d.students||[])];if(sortNames)list.sort((a,b)=>a.name.localeCompare(b.name,'ko',{numeric:true}));return `<div class="row between"><h3>학생 ${d.studentCount}명 · 제출 ${d.submitted}명</h3><button id="sort" class="secondary">${sortNames?'이름·번호순':'접속순'}</button></div><div class="chips">${list.map(s=>`<button class="chip ${s.submitted?'done':''}" data-kick="${s.id}" title="클릭하면 내보내기">${esc(s.name)}${s.submitted?' ✓':''}</button>`).join('')||'<p class="subtle">학생을 기다리고 있어요.</p>'}</div>`;}
-function bindStudents(){on('sort',()=>{sortNames=!sortNames;renderTeacher(state);bindCommon();});document.querySelectorAll('[data-kick]').forEach(b=>b.onclick=busy(b,async()=>{if(confirm(b.textContent+' 학생을 이 방에서 내보낼까요?'))await action('kick',{id:b.dataset.kick});}));}
+function bindStudents(){on('sort',()=>{sortNames=!sortNames;renderTeacher(state);bindCommon();});documentquerySelectorAll('[data-kick]').forEach(b=>b.onclick=busy(b,async()=>{if(confirm(b.textContent+' 학생을 이 방에서 내보낼까요?'))await action('kick',{id:b.dataset.kick});}));}
 function answers(d){return `<div class="scroll"><table><thead><tr><th>학생</th><th>예측 가격</th><th>문장</th>${d.phase==='reveal'?'<th>점수</th>':''}</tr></thead><tbody>${(d.answers||[]).map(a=>`<tr><td>${esc(a.name)}</td><td>${won(a.value)}</td><td>${esc(a.prefix+' '+a.text)}</td>${d.phase==='reveal'?`<td>+${a.result?.points||0}${a.result?.perfect?' 🎯':''}</td>`:''}</tr>`).join('')||'<tr><td colspan="4">제출한 답안이 없습니다.</td></tr>'}</tbody></table></div>`;}
-function renderTeacher(d){let html=header(d);if(d.phase==='lobby'){html+=`<div class="grid"><section class="card center"><div class="eyebrow">JOIN THE CLASS</div><h2>가격 탐험에 초대합니다</h2>${qrHTML()}<button id="copyLink" class="secondary">학생 주소 복사</button></section><section class="card">${students(d)}<div class="actions"><button id="start" class="green wide" ${d.studentCount?'':'disabled'}>첫 문제 시작 ▶</button></div><p class="subtle">문제의 그림은 교사 화면에만 나옵니다. TV·프로젝터로 보여 주세요.</p></section></div>`;}
- else if(d.phase==='question'){let q=d.question;html+=`<section class="card"><div class="row between"><h2>How much is it? / How much are they?</h2><span id="timer" class="timer"></span></div><div class="question-art">${q.image?`<img src="${esc(q.image)}" alt="${esc(q.name)}">`:`<div class="emoji" role="img" aria-label="${esc(q.name)}">${esc(q.emoji)}</div>`}</div><h3 class="center">${esc(q.name)}</h3><div class="row actions"><button id="close" class="green">답안 마감 ✋</button>${d.deadline?'<button id="extend" class="secondary">+15초</button>':''}</div>${students(d)}</section>`;}
- else if(d.phase==='closed'){html+=`<section class="card"><div class="eyebrow">GUESSES ARE IN</div><h2>누가 가장 가까울까요?</h2><p class="subtle">싼 가격부터 정렬했어요. 영어 문장으로 함께 읽어 보세요.</p>${answers(d)}<div class="actions"><button id="reveal" class="green wide">💰 가격 공개</button></div></section>`;}
- else if(d.phase==='reveal'){let q=d.question,displayImg=q.revealImage||q.image;html+=`<section class="card center"><div class="eyebrow">THE REAL PRICE · 연습용 가격</div><div class="question-art">${displayImg?`<img src="${esc(displayImg)}" alt="${esc(q.name)}">`:`<div class="emoji" role="img" aria-label="${esc(q.name)}">${esc(q.emoji)}</div>`}</div><h3 class="center">${esc(q.name)}</h3><div class="price">${won(q.price)}</div><p class="sentence">${esc(q.sentence)}</p><button id="speak" class="secondary">🔊 정답 문장 듣기</button><div class="row actions">${d.round+1<d.total?'<button id="next" class="green">다음 문제 ▶</button>':''}<button id="finish" class="secondary">🏆 ${d.round+1<d.total?'여기서 마치고 ':''}시상식</button></div></section><div class="grid"><section class="card"><h3>모두의 예측</h3>${answers(d)}</section><section class="card"><h3>현재 순위</h3>${ranking(d)}</section></div>`;}
- else {html+=`<section class="card"><div class="eyebrow">CLASS CELEBRATION</div><h2>🏆 오늘의 가격 탐험가</h2>${(d.awards||[]).map(a=>`<div class="award"><strong>${esc(a.title)}</strong><br>${esc(a.names)}</div>`).join('')}<h3>최종 순위</h3>${ranking(d)}<div class="actions"><button id="csv" class="secondary">결과 CSV 저장</button></div><p class="subtle">끝났으면 방 삭제를 눌러 학생 기록을 지워 주세요.</p></section>`;}
- app.innerHTML=html;bindStudents();on('start',()=>action('start'));on('close',()=>action('close'));on('extend',()=>action('extend'));
- on('reveal', async () => {
-   const btn = $('#reveal');
-   if (btn) {
-     btn.disabled = true;
-     btn.textContent = '🥁 두구두구두구...';
-   }
-   playDrumroll(2200);
-   await new Promise(resolve => setTimeout(resolve, 2200));
-   await action('reveal');
- });
- on('next',()=>action('next'));on('finish',()=>action('finish'));on('copyLink',async()=>{try{await navigator.clipboard.writeText(joinURL());status('학생 주소를 복사했습니다.',false);}catch{prompt('아래 주소를 복사하세요.',joinURL());}});on('speak',()=>speak(d.question.sentence));on('csv',()=>downloadCSV(d));}
+
+function renderTeacher(d){
+  let html=header(d);
+  if(d.phase==='lobby'){
+    html+=`<div class="grid"><section class="card center"><div class="eyebrow">JOIN THE CLASS</div><h2>가격 탐험에 초대합니다</h2>${qrHTML()}<button id="copyLink" class="secondary">학생 주소 복사</button></section><section class="card">${students(d)}<div class="actions"><button id="start" class="green wide" ${d.studentCount?'':'disabled'}>첫 문제 시작 ▶</button></div><p class="subtle">문제의 그림은 교사 화면에만 나옵니다. TV·프로젝터로 보여 주세요.</p></section></div>`;
+  }
+  else if(d.phase==='question'){
+    let q=d.question;
+    html+=`<section class="card"><div class="row between"><h2>How much is it? / How much are they?</h2><span id="timer" class="timer"></span></div><div class="question-art">${q.image?`<img src="${esc(q.image)}" alt="${esc(q.name)}">`:`<div class="emoji" role="img" aria-label="${esc(q.name)}">${esc(q.emoji)}</div>`}</div><h3 class="center">${esc(q.name)}</h3><div class="row actions"><button id="close" class="green">답안 마감 ✋</button>${d.deadline?'<button id="extend" class="secondary">+15초</button>':''}</div>${students(d)}</section>`;
+  }
+  else if(d.phase==='closed'){
+    let q=d.question;
+    html+=`<div class="grid" style="grid-template-columns: 45% 53%; gap:2%;"><section class="card center"><div class="eyebrow">QUESTION</div><div class="question-art">${q.image?`<img src="${esc(q.image)}" alt="${esc(q.name)}">`:`<div class="emoji">${esc(q.emoji)}</div>`}</div><h3 style="margin-top:15px;">${esc(q.name)}</h3></section><section class="card"><div class="eyebrow">GUESSES ARE IN</div><h2>누가 가장 가까울까요?</h2><p class="subtle">싼 가격부터 정렬했어요.</p>${answers(d)}<div class="actions" style="margin-top:20px;"><button id="reveal" class="green wide">💰 가격 공개</button></div></section></div>`;
+  }
+  else if(d.phase==='reveal'){
+    let q=d.question,displayImg=q.revealImage||q.image;
+    html+=`<div class="grid" style="grid-template-columns: 45% 53%; gap:2%;"><section class="card center"><div class="eyebrow">REVEAL PHOTO</div><div class="question-art">${displayImg?`<img src="${esc(displayImg)}" alt="${esc(q.name)}">`:`<div class="emoji">${esc(q.emoji)}</div>`}</div><h3 style="margin-top:15px;">${esc(q.name)}</h3></section><section class="card center"><div class="eyebrow">THE REAL PRICE · 연습용 가격</div><div class="price" style="margin:10px 0;">${won(q.price)}</div><p class="sentence" style="margin-bottom:15px;">${esc(q.sentence)}</p><button id="speak" class="secondary" style="margin-bottom:15px;">🔊 정답 문장 듣기</button><div class="row actions" style="justify-content:center;margin-bottom:20px;">${d.round+1<d.total?'<button id="next" class="green">다음 문제 ▶</button>':''}<button id="finish" class="secondary">🏆 ${d.round+1<d.total?'여기서 마치고 ':''}시상식</button></div><hr style="border:0;border-top:1px solid #e0e9f0;margin:15px 0;"><div style="text-align:left;"><h3>모두의 예측 및 결과</h3>${answers(d)}</div></section></div>`;
+  }
+  else {
+    html+=`<section class="card"><div class="eyebrow">CLASS CELEBRATION</div><h2>🏆 오늘의 가격 탐험가</h2>${(d.awards||[]).map(a=>`<div class="award"><strong>${esc(a.title)}</strong><br>${esc(a.names)}</div>`).join('')}<h3>최종 순위</h3>${ranking(d)}<div class="actions"><button id="csv" class="secondary">결과 CSV 저장</button></div><p class="subtle">끝났으면 방 삭제를 눌러 학생 기록을 지워 주세요.</p></section>`;
+  }
+  app.innerHTML=html;bindStudents();on('start',()=>action('start'));on('close',()=>action('close'));on('extend',()=>action('extend'));
+  on('reveal', async () => {
+    const btn = $('#reveal');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '🥁 두구두구두구...';
+    }
+    playDrumroll(2200);
+    await new Promise(resolve => setTimeout(resolve, 2200));
+    await action('reveal');
+  });
+  on('next',()=>action('next'));on('finish',()=>action('finish'));on('copyLink',async()=>{try{await navigator.clipboard.writeText(joinURL());status('학생 주소를 복사했습니다.',false);}catch{prompt('아래 주소를 복사하세요.',joinURL());}});on('speak',()=>speak(d.question.sentence));on('csv',()=>downloadCSV(d));
+}
+
 function keyboard(){return `<div class="keyboard" aria-label="영어 화면 키보드">${['qwertyuiop','asdfghjkl','zxcvbnm'].map(row=>`<div class="keyrow">${[...row].map(k=>`<button class="key" data-key="${k}" type="button">${k}</button>`).join('')}</div>`).join('')}<div class="keyrow"><button class="key widekey" data-key="clear">지우기</button><button class="key space" data-key=" ">space</button><button class="key widekey" data-key="back">⌫</button></div></div>`;}
 function studentAnswer(d){let a=d.me.answer;if(a&&!editing)return `<div class="hero"><div class="badge">제출 완료 ✓</div><p class="sentence">${esc(a.prefix+' '+a.text)} won.</p><div class="big-number">${won(a.value)}</div><p>마감 전에는 답을 바꿀 수 있어요.</p><button id="edit" class="secondary">✏️ 고치기</button></div>`;return `<p class="subtle">TV의 그림을 보고 가격을 영어로 써 주세요.</p>${d.settings.sentence?`<div class="prefix"><button id="it" type="button">It is</button><button id="they" type="button">They are</button></div>`:''}<label for="answer">${d.settings.allowDigits?'가격 (영어 또는 숫자)':'가격 (영어 단어)'}</label><textarea id="answer" class="answer" readonly inputmode="none" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" placeholder="예: eleven thousand three hundred"></textarea><div class="row"><span class="pill">won.</span><button id="systemKeyboard" class="secondary">기기 키보드 사용</button><button id="mic" class="secondary">🎤 말해서 쓰기</button></div><div id="feedback" class="feedback" aria-live="polite"></div>${keyboard()}<button id="submit" class="green wide">답안 제출 ✓</button><p class="subtle">기본 화면 키보드는 자동 완성 없이 철자를 연습합니다.</p>`;}
 function renderStudent(d){const changedRound=d.round!==draftRound;if(changedRound){draftRound=d.round;draft={text:d.me.answer?.text||'',prefix:d.me.answer?.prefix||''};editing=false;}let html=header(d);if(d.phase==='lobby')html+=`<section class="card narrow hero"><div class="emoji">🛍️</div><h2>준비됐어요!</h2><p>${esc(d.me.name)}, 선생님이 시작할 때까지 기다려 주세요.</p><p class="subtle">How much is it? · It is … won.</p></section>`;
@@ -129,7 +147,7 @@ async function compressImage(f){
       img.onerror = () => reject(Error('이미지 파일을 읽을 수 없어요.'));
       img.onload = () => {
         try {
-          let maxDim = 500;
+          let maxDim = 800;
           let width = img.width;
           let height = img.height;
           if (width > maxDim || height > maxDim) {
@@ -147,9 +165,9 @@ async function compressImage(f){
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
           
-          let out = canvas.toDataURL('image/jpeg', 0.6);
+          let out = canvas.toDataURL('image/jpeg', 0.65);
           if (out.length > 160000) {
-            out = canvas.toDataURL('image/jpeg', 0.3);
+            out = canvas.toDataURL('image/jpeg', 0.35);
           }
           resolve(out);
         } catch (err) {
