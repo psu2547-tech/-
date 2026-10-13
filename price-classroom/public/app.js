@@ -23,7 +23,7 @@ function showQR(){$('#qrContent').innerHTML=qrHTML();$('#qrDialog').showModal();
 $('#closeQR').onclick=()=>$('#qrDialog').close();
 function render(d){if(teacher)renderTeacher(d);else renderStudent(d);bindCommon();}
 function students(d){let list=[...(d.students||[])];if(sortNames)list.sort((a,b)=>a.name.localeCompare(b.name,'ko',{numeric:true}));return `<div class="row between"><h3>학생 ${d.studentCount}명 · 제출 ${d.submitted}명</h3><button id="sort" class="secondary">${sortNames?'이름·번호순':'접속순'}</button></div><div class="chips">${list.map(s=>`<button class="chip ${s.submitted?'done':''}" data-kick="${s.id}" title="클릭하면 내보내기">${esc(s.name)}${s.submitted?' ✓':''}</button>`).join('')||'<p class="subtle">학생을 기다리고 있어요.</p>'}</div>`;}
-function bindStudents(){on('sort',()=>{sortNames=!sortNames;renderTeacher(state);bindCommon();});documentquerySelectorAll('[data-kick]').forEach(b=>b.onclick=busy(b,async()=>{if(confirm(b.textContent+' 학생을 이 방에서 내보낼까요?'))await action('kick',{id:b.dataset.kick});}));}
+function bindStudents(){on('sort',()=>{sortNames=!sortNames;renderTeacher(state);bindCommon();});document.querySelectorAll('[data-kick]').forEach(b=>b.onclick=busy(b,async()=>{if(confirm(b.textContent+' 학생을 이 방에서 내보낼까요?'))await action('kick',{id:b.dataset.kick});}));}
 function answers(d){return `<div class="scroll"><table><thead><tr><th>학생</th><th>예측 가격</th><th>문장</th>${d.phase==='reveal'?'<th>점수</th>':''}</tr></thead><tbody>${(d.answers||[]).map(a=>`<tr><td>${esc(a.name)}</td><td>${won(a.value)}</td><td>${esc(a.prefix+' '+a.text)}</td>${d.phase==='reveal'?`<td>+${a.result?.points||0}${a.result?.perfect?' 🎯':''}</td>`:''}</tr>`).join('')||'<tr><td colspan="4">제출한 답안이 없습니다.</td></tr>'}</tbody></table></div>`;}
 
 function renderTeacher(d){
