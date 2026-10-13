@@ -57,15 +57,111 @@ function bindAnswer(d,selection){let field=$('#answer');if(!field)return;field.v
  on('systemKeyboard',()=>{field.readOnly=!field.readOnly;field.inputMode=field.readOnly?'none':'text';$('#systemKeyboard').textContent=field.readOnly?'기기 키보드 사용':'화면 키보드만 사용';field.focus();});on('submit',async()=>{let submitted={...draft};await api('/api/submit',{code:session.code,round:state.round,...submitted});editing=false;status();lastView='';await poll();});on('mic',()=>{const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Speech){status('이 브라우저에서는 음성인식을 지원하지 않아요. 화면 키보드를 사용하세요.');return;}if(!confirm('음성인식은 브라우저 제공 기능입니다. 목소리가 Google·Apple 등 브라우저 제공업체로 전송될 수 있습니다. 학교 지침을 확인했으며 사용할까요?'))return;const recog=new Speech();recog.lang='en-US';recog.interimResults=false;recog.onresult=e=>{let t=e.results[0][0].transcript.toLowerCase().replace(/[.!?]$/,'').replace(/^it is /,'').replace(/^they are /,'').replace(/ won$/,'');if(/^\d[\d,]*$/.test(t)){let n=Number(t.replace(/,/g,''));t=English.words(n)||t;}draft.text=t.slice(0,160);if($('#answer')){$('#answer').value=draft.text;updateFeedback();}};recog.onerror=()=>status('음성인식을 사용할 수 없어요. 화면 키보드로 입력하세요.');recog.start();});updateFeedback();}
 function speak(text){if(!window.speechSynthesis){status('이 브라우저는 문장 읽기를 지원하지 않습니다.');return;}speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(text);u.lang='en-US';u.rate=.85;speechSynthesis.speak(u);}
 function downloadCSV(d){let cell=s=>'"'+String(s??'').replace(/^[=+@-]/,"'$&").replace(/"/g,'""')+'"';let rows=[['순위','학생','점수','Perfect','문장 정답'],...d.ranking.map(s=>[s.rank,s.name,s.score,s.perfect,s.grammar])];let blob=new Blob(['\ufeff'+rows.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='price-class-results.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
-function editor(){let el=$('#editor');el.innerHTML=questions.map((q,i)=>`<div class="editor-item" data-i="${i}"><div class="row"><strong>${i+1}</strong><input class="mini" data-field="emoji" value="${esc(q.emoji)}" aria-label="그림 이모지"><input class="name" data-field="name" value="${esc(q.name)}" aria-label="물건 이름"><input class="mini" data-field="price" type="number" min="1" max="999999" value="${q.price}" aria-label="가격"><label><input type="checkbox" data-field="plural" ${q.plural?'checked':''}> They are</label><button class="danger" data-remove="${i}">삭제</button></div><div class="row"><label>1. 문제 사진 (가격 가려진 사진)<input type="file" data-image="${i}" accept="image/jpeg,image/png,image/webp"></label>${q.image?`<img src="${esc(q.image)}" alt="문제 사진"><button data-clear-image="${i}" class="secondary">지우기</button>`:''}</div><div class="row"><label>2. 정답 사진 (가격 적힌 사진, 선택)<input type="file" data-reveal-image="${i}" accept="image/jpeg,image/png,image/webp"></label>${q.revealImage?`<img src="${esc(q.revealImage)}" alt="정답 사진"><button data-clear-reveal-image="${i}" class="secondary">지우기</button>`:''}</div></div>`).join('');
- el.querySelectorAll('[data-field]').forEach(input=>input.oninput=()=>{let q=questions[Number(input.closest('[data-i]').dataset.i)],k=input.dataset.field;q[k]=k==='plural'?input.checked:k==='price'?Number(input.value):input.value;});
- el.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{questions.splice(Number(b.dataset.remove),1);editor();});
- el.querySelectorAll('[data-clear-image]').forEach(b=>b.onclick=()=>{questions[Number(b.dataset.clearImage)].image='';editor();});
- el.querySelectorAll('[data-clear-reveal-image]').forEach(b=>b.onclick=()=>{questions[Number(b.dataset.clearRevealImage)].revealImage='';editor();});
- el.querySelectorAll('[data-image]').forEach(input=>input.onchange=async()=>{let f=input.files[0];if(!f)return;try{let image=await compressImage(f);questions[Number(input.dataset.image)].image=image;editor();}catch(e){error(e);}});
- el.querySelectorAll('[data-reveal-image]').forEach(input=>input.onchange=async()=>{let f=input.files[0];if(!f)return;try{let image=await compressImage(f);questions[Number(input.dataset.revealImage)].revealImage=image;editor();}catch(e){error(e);}});
- $('#questionCount').textContent=questions.length+'문제';}
-async function compressImage(f){if(!['image/jpeg','image/png','image/webp'].includes(f.type)||f.size>20*1024*1024)throw Error('20MB 이하 JPG·PNG·WebP 사진을 선택하세요.');return new Promise((resolve,reject)=>{let img=new Image(),u=URL.createObjectURL(f);img.onload=()=>{URL.revokeObjectURL(u);let maxDim=600;let canvas=document.createElement('canvas');let ctx=canvas.getContext('2d');let scale=Math.min(1,maxDim/Math.max(img.width,img.height));canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);ctx.drawImage(img,0,0,canvas.width,canvas.height);let out=canvas.toDataURL('image/jpeg',0.6);if(out.length>170000){maxDim=400;scale=Math.min(1,maxDim/Math.max(img.width,img.height));canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);ctx.drawImage(img,0,0,canvas.width,canvas.height);out=canvas.toDataURL('image/jpeg',0.35);}resolve(out);};img.onerror=()=>{URL.revokeObjectURL(u);reject(Error('사진을 읽지 못했어요.'));};img.src=u;});}
+
+function editor(){
+  let el=$('#editor');
+  el.innerHTML=questions.map((q,i)=>`<div class="editor-item" data-i="${i}">
+    <div class="row">
+      <strong>${i+1}</strong>
+      <input class="mini" data-field="emoji" value="${esc(q.emoji)}" aria-label="그림 이모지">
+      <input class="name" data-field="name" value="${esc(q.name)}" aria-label="물건 이름">
+      <input class="mini" data-field="price" type="number" min="1" max="999999" value="${q.price}" aria-label="가격">
+      <label><input type="checkbox" data-field="plural" ${q.plural?'checked':''}> They are</label>
+      <button class="danger" data-remove="${i}">삭제</button>
+    </div>
+    <div class="row" style="align-items:center;gap:12px;margin-top:8px;">
+      <label style="margin:0;">1. 문제 사진 (가격 가려진 사진)
+        <input type="file" data-image="${i}" accept="image/*">
+      </label>
+      ${q.image ? `<div class="row" style="align-items:center;"><img src="${esc(q.image)}" alt="문제 사진" style="height:60px;border-radius:8px;border:1px solid #ccc;"><button data-clear-image="${i}" class="secondary" style="min-height:36px;padding:6px 12px;">지우기</button></div>` : '<span class="subtle">(사진 없음)</span>'}
+    </div>
+    <div class="row" style="align-items:center;gap:12px;margin-top:8px;">
+      <label style="margin:0;">2. 정답 사진 (가격 적힌 사진, 선택)
+        <input type="file" data-reveal-image="${i}" accept="image/*">
+      </label>
+      ${q.revealImage ? `<div class="row" style="align-items:center;"><img src="${esc(q.revealImage)}" alt="정답 사진" style="height:60px;border-radius:8px;border:1px solid #ccc;"><button data-clear-reveal-image="${i}" class="secondary" style="min-height:36px;padding:6px 12px;">지우기</button></div>` : '<span class="subtle">(사진 없음)</span>'}
+    </div>
+  </div>`).join('');
+
+  el.querySelectorAll('[data-field]').forEach(input=>input.oninput=()=>{let q=questions[Number(input.closest('[data-i]').dataset.i)],k=input.dataset.field;q[k]=k==='plural'?input.checked:k==='price'?Number(input.value):input.value;});
+  el.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{questions.splice(Number(b.dataset.remove),1);editor();});
+  el.querySelectorAll('[data-clear-image]').forEach(b=>b.onclick=()=>{questions[Number(b.dataset.clearImage)].image='';editor();});
+  el.querySelectorAll('[data-clear-reveal-image]').forEach(b=>b.onclick=()=>{questions[Number(b.dataset.clearRevealImage)].revealImage='';editor();});
+
+  el.querySelectorAll('[data-image]').forEach(input=>input.onchange=async()=>{
+    let f=input.files[0];
+    if(!f)return;
+    try{
+      status('사진 처리 중...', false);
+      let image=await compressImage(f);
+      questions[Number(input.dataset.image)].image=image;
+      status('사진 등록 완료!', false);
+      editor();
+    }catch(e){
+      error(e);
+    }
+  });
+
+  el.querySelectorAll('[data-reveal-image]').forEach(input=>input.onchange=async()=>{
+    let f=input.files[0];
+    if(!f)return;
+    try{
+      status('사진 처리 중...', false);
+      let image=await compressImage(f);
+      questions[Number(input.dataset.revealImage)].revealImage=image;
+      status('정답 사진 등록 완료!', false);
+      editor();
+    }catch(e){
+      error(e);
+    }
+  });
+
+  $('#questionCount').textContent=questions.length+'문제';
+}
+
+async function compressImage(f){
+  if(!f) throw Error('파일을 선택해 주세요.');
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onerror = () => reject(Error('파일을 읽지 못했어요.'));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(Error('이미지 파일을 읽을 수 없어요.'));
+      img.onload = () => {
+        try {
+          let maxDim = 500;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          let out = canvas.toDataURL('image/jpeg', 0.6);
+          if (out.length > 160000) {
+            out = canvas.toDataURL('image/jpeg', 0.3);
+          }
+          resolve(out);
+        } catch (err) {
+          reject(Error('사진 변환 중 오류가 발생했습니다.'));
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(f);
+  });
+}
+
 function exportQuestions(){let blob=new Blob([JSON.stringify(questions,null,2)],{type:'application/json'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='my-price-questions.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
 async function setup(){app.innerHTML=`<section class="card narrow"><div class="eyebrow">TEACHER STUDIO</div><h2>우리 반 가격 맞히기</h2><p class="subtle">방 만들기 → 학생 입장 → 사진·그림 → 영어 답안 → 가격 공개 → 시상식</p><label>교사 비밀번호<input id="pin" type="password" autocomplete="current-password" placeholder="배포할 때 정한 TEACHER_PIN"></label><div class="grid"><label>문제당 제한 시간<select id="seconds">${[20,30,45,60,90,120,0].map(n=>`<option value="${n}" ${n===60?'selected':''}>${n?n+'초':'없음 · 직접 마감'}</option>`).join('')}</select></label><label>가격 입력<select id="digits"><option value="no">영어 단어로만</option><option value="yes">숫자도 허용</option></select></label></div><label><input id="sentence" type="checkbox" checked> It is / They are 고르기</label><label><input id="auto" type="checkbox" checked> 모두 제출하면 자동 마감</label><p class="muted-block">기본 20문제는 이모지 그림과 연습용 가격입니다. 원본 사이트의 상품 사진·판매가격을 복사하지 않았습니다. 아래에서 직접 사진과 가격을 바꿀 수 있어요.</p><button id="create" class="green wide">수업 방 만들기</button></section><section class="card"><details><summary>📦 문제 세트 편집 · <span id="questionCount">불러오는 중</span></summary><div class="row"><button id="add" class="secondary">문제 추가</button><button id="exportQ" class="secondary">내 문제 저장</button><label>내 문제 불러오기<input id="importQ" type="file" accept="application/json,.json"></label></div><p class="subtle">사진은 브라우저에서 축소 후 서버 메모리에 저장됩니다. 학생 얼굴·이름이 담긴 사진은 사용하지 마세요.</p><div id="editor"></div></details></section>`;
  try{if(!questions.length)questions=await api('/api/samples',null,'');editor();}catch(e){error(e);}
